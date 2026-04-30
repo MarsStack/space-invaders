@@ -1,4 +1,8 @@
 import javax.swing.*;
+import java.awt.event.KeyEvent;
+import java.awt.event.KeyListener;
+import java.util.HashSet;
+import java.util.Set;
 
 /**
  * GameController.java
@@ -15,17 +19,24 @@ import javax.swing.*;
  * - Handle keyboard input from the player
  * - Coordinate updates between model and view
  */
-public class GameController {
+public class GameController implements KeyListener {
 
     private GameModel model;
     private GameView view;
     private JFrame frame;
+    private Timer gameLoop;
     private static final int FPS = 60;  // Target frames per second
+    private static final int TIMER_DELAY = 1000 / FPS;  // ~16.67 ms per frame
+
+    // Track which keys are currently pressed
+    private Set<Integer> pressedKeys;
 
     /**
      * Constructor - initializes the controller and sets up the game
      */
     public GameController() {
+        this.pressedKeys = new HashSet<>();
+
         // Create model
         this.model = new GameModel();
 
@@ -41,8 +52,10 @@ public class GameController {
         frame.setLocationRelativeTo(null);  // Center on screen
         frame.setVisible(true);
 
-        // TODO: Add keyboard input listener
-        // TODO: Start game loop timer
+        // Add keyboard input listener
+        view.addKeyListener(this);
+        view.setFocusable(true);
+        view.requestFocusInWindow();
     }
 
     /**
@@ -50,9 +63,63 @@ public class GameController {
      * Uses a Timer to update the model and view at regular intervals
      */
     private void startGameLoop() {
-        // TODO: Create and start a Swing Timer
-        // TODO: Timer should call model.update() and view.updateDisplay()
-        // TODO: Set timer delay based on FPS (1000 / FPS milliseconds)
+        gameLoop = new Timer(TIMER_DELAY, e -> updateGame());
+        gameLoop.start();
+    }
+
+    /**
+     * Update the game each frame
+     * Handles input, updates model, and redraws view
+     */
+    private void updateGame() {
+        // Handle continuous key presses
+        if (pressedKeys.contains(KeyEvent.VK_LEFT)) {
+            model.movePlayerLeft();
+        }
+        if (pressedKeys.contains(KeyEvent.VK_RIGHT)) {
+            model.movePlayerRight();
+        }
+
+        // Update game model
+        model.update();
+
+        // Redraw view
+        view.updateDisplay();
+
+        // Stop the game loop if game is over
+        if (!model.isGameRunning()) {
+            gameLoop.stop();
+        }
+    }
+
+    /**
+     * KeyListener implementation - called when a key is pressed
+     */
+    @Override
+    public void keyPressed(KeyEvent e) {
+        int keyCode = e.getKeyCode();
+        pressedKeys.add(keyCode);
+
+        // Handle spacebar to fire
+        if (keyCode == KeyEvent.VK_SPACE) {
+            model.fireProjectile();
+        }
+    }
+
+    /**
+     * KeyListener implementation - called when a key is released
+     */
+    @Override
+    public void keyReleased(KeyEvent e) {
+        pressedKeys.remove(e.getKeyCode());
+    }
+
+    /**
+     * KeyListener implementation - called for key characters
+     */
+    @Override
+    public void keyTyped(KeyEvent e) {
+        // Not used
     }
 
     /**
