@@ -31,9 +31,17 @@ public class GameModel {
     private static final int ALIEN_COLS = 11;
     private static final int ALIEN_SPEED = 1;
     private static final int ALIEN_DROP = 15;
+    private static final int SPEED_INCREMENT = 1; // Increase speed per alien destroyed
+    private static final int BASE_TIMER_INTERVAL = 1000 / 60; // 60 FPS target
 
     private static final int BULLET_SPEED = 7;
     private static final int ALIEN_BULLET_SPEED = 4;
+
+    private static final int SHIELD_WIDTH = 40;
+    private static final int SHIELD_HEIGHT = 40;
+    private static final int SHIELD_HEALTH = 3;
+    private static final int SHIELD_COUNT = 4;
+    private static final int SHIELD_Y = 400;
 
     // Player data
     private int playerX;
@@ -44,12 +52,16 @@ public class GameModel {
     private int alienFormationX;
     private int alienFormationY;
     private int alienDirection; // 1 = right, -1 = left
+    private int currentAlienSpeed; // Speed increases as aliens are destroyed
 
     // Bullets
     private PlayerBullet playerBullet;
     private List<AlienBullet> alienBullets;
     private int alienFireCounter;
     private static final int ALIEN_FIRE_RATE = 120; // Fire every ~2 seconds at 60 FPS
+
+    // Shields
+    private List<Shield> shields;
 
     // Game state
     private boolean isRunning;
@@ -90,6 +102,28 @@ public class GameModel {
     }
 
     /**
+     * Inner class to represent a shield block
+     */
+    public static class Shield {
+        public int x, y;
+        public int health;
+
+        public Shield(int x, int y, int health) {
+            this.x = x;
+            this.y = y;
+            this.health = health;
+        }
+
+        public boolean isDestroyed() {
+            return health <= 0;
+        }
+
+        public void takeDamage() {
+            health--;
+        }
+    }
+
+    /**
      * Constructor - initializes the game model
      */
     public GameModel() {
@@ -114,11 +148,20 @@ public class GameModel {
         this.alienFormationX = 50;
         this.alienFormationY = 50;
         this.alienDirection = 1; // Start moving right
+        this.currentAlienSpeed = ALIEN_SPEED;
 
         // Initialize bullets
         this.playerBullet = null;
         this.alienBullets = new ArrayList<>();
         this.alienFireCounter = 0;
+
+        // Initialize shields - 4 shields spread across the screen
+        this.shields = new ArrayList<>();
+        int shieldSpacing = GAME_WIDTH / (SHIELD_COUNT + 1);
+        for (int i = 1; i <= SHIELD_COUNT; i++) {
+            int shieldX = i * shieldSpacing - SHIELD_WIDTH / 2;
+            shields.add(new Shield(shieldX, SHIELD_Y, SHIELD_HEALTH));
+        }
     }
 
     /**
@@ -160,6 +203,9 @@ public class GameModel {
         // Check collisions
         checkCollisions();
 
+        // Check shield collisions
+        checkShieldCollisions();
+
         // Check if player lost a life
         for (AlienBullet bullet : alienBullets) {
             if (bullet.active && isColliding(bullet.x, bullet.y, 5, playerX, playerY, PLAYER_SIZE)) {
@@ -170,6 +216,9 @@ public class GameModel {
                 }
             }
         }
+
+        // Remove destroyed shields
+        shields.removeIf(Shield::isDestroyed);
 
         // Check if aliens reached the bottom
         int bottomMostAlien = alienFormationY + (ALIEN_ROWS - 1) * ALIEN_SIZE;
@@ -193,8 +242,8 @@ public class GameModel {
             alienDirection *= -1;
         }
 
-        // Move horizontally
-        alienFormationX += alienDirection * ALIEN_SPEED;
+        // Move horizontally using current speed (increases as aliens are destroyed)
+        alienFormationX += alienDirection * currentAlienSpeed;
     }
 
     /**
@@ -239,6 +288,7 @@ public class GameModel {
                         playerBullet.active = false;
                         score += 10;
                         alienKillCount++;
+                        currentAlienSpeed += SPEED_INCREMENT; // Increase alien speed
                         return;
                     }
                 }
@@ -251,6 +301,37 @@ public class GameModel {
      */
     private boolean isColliding(int x1, int y1, int w1, int x2, int y2, int w2) {
         return x1 < x2 + w2 && x1 + w1 > x2 && y1 < y2 + w2 && y1 + w1 > y2;
+    }
+
+    /**
+     * Check collisions between bullets and shields
+     */
+    private void checkShieldCollisions() {
+        // Check player bullet collisions with shields
+        if (playerBullet != null && playerBullet.active) {
+            for (Shield shield : shields) {
+                if (isColliding(playerBullet.x, playerBullet.y, 5,
+                              shield.x, shield.y, SHIELD_WIDTH)) {
+                    playerBullet.active = false;
+                    shield.takeDamage();
+                    return;
+                }
+            }
+        }
+
+        // Check alien bullet collisions with shields
+        for (AlienBullet bullet : alienBullets) {
+            if (bullet.active) {
+                for (Shield shield : shields) {
+                    if (isColliding(bullet.x, bullet.y, 4,
+                                  shield.x, shield.y, SHIELD_WIDTH)) {
+                        bullet.active = false;
+                        shield.takeDamage();
+                        return;
+                    }
+                }
+            }
+        }
     }
 
     /**
@@ -326,12 +407,24 @@ public class GameModel {
         return ALIEN_SIZE;
     }
 
+    public int getShieldWidth() {
+        return SHIELD_WIDTH;
+    }
+
+    public int getShieldHeight() {
+        return SHIELD_HEIGHT;
+    }
+
     public PlayerBullet getPlayerBullet() {
         return playerBullet;
     }
 
     public List<AlienBullet> getAlienBullets() {
         return alienBullets;
+    }
+
+    public List<Shield> getShields() {
+        return shields;
     }
 
     public int getScore() {
@@ -352,5 +445,16 @@ public class GameModel {
 
     public static int getAlienCols() {
         return ALIEN_COLS;
+    }
+
+    /**
+     * Get the current recommended timer interval in milliseconds.
+     * The interval decreases (faster game) as aliens are destroyed and speed increases.
+     * @return timer interval in milliseconds for the game loop
+     */
+    public int getRecommendedTimerInterval() {
+        // Calculate interval inversely proportional to speed
+        // As speed increases, interval decreases (faster updates)
+        return Math.max(5, BASE_TIMER_INTERVAL * ALIEN_SPEED / currentAlienSpeed);
     }
 }

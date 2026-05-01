@@ -54,6 +54,34 @@ public class GameView extends JPanel {
         // Draw game entities
         drawPlayer(g2d);
         drawAliens(g2d);
+
+        // Draw shields
+        int shieldWidth = model.getShieldWidth();
+        int shieldHeight = model.getShieldHeight();
+        for (GameModel.Shield shield : model.getShields()) {
+            // Color based on health: green (full) -> yellow (damaged) -> red (critical)
+            if (shield.health >= 3) {
+                g2d.setColor(Color.GREEN);
+            } else if (shield.health == 2) {
+                g2d.setColor(new Color(255, 255, 0)); // Yellow
+            } else {
+                g2d.setColor(new Color(200, 0, 0)); // Dim red
+            }
+
+            // Draw shield rectangle
+            g2d.fillRect(shield.x, shield.y, shieldWidth, shieldHeight);
+
+            // Draw outline
+            g2d.setColor(Color.WHITE);
+            g2d.setStroke(new BasicStroke(1));
+            g2d.drawRect(shield.x, shield.y, shieldWidth, shieldHeight);
+
+            // Draw health indicator
+            g2d.setColor(Color.WHITE);
+            g2d.setFont(new Font("Arial", Font.BOLD, 12));
+            g2d.drawString(String.valueOf(shield.health), shield.x + shieldWidth / 2 - 3, shield.y + shieldHeight / 2 + 4);
+        }
+
         drawBullets(g2d);
         drawHUD(g2d);
 
